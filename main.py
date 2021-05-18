@@ -1,6 +1,8 @@
 import pygame as pg
 import random
-
+import math
+from pygame import mixer
+# mixer helps is using music
 
 
 # reference - https://www.youtube.com/watch?v=FfWpgLFMI7w
@@ -43,6 +45,13 @@ Like moving arrow , close button pressed
 background = pg.image.load('./images/background.png')
 
 
+# Background sound
+# -1 helps in playing in loop
+# music is because we are playing continuously 
+# for playing sounds for a short period of time we use sound
+mixer.music.load('./sound/background.wav')
+mixer.music.play(-1)
+
 
 # Title and Icon
 # Title
@@ -64,13 +73,22 @@ playerx_change = 0
 
 
 # Setting the enemy
-enemyimg = pg.image.load('./images/enemy.png')
-# playerx and playery are coordinates , pygame follows (0,0) coordinate system
-enemyx = random.randint(0, 800)
-enemyy = random.randint(50, 150)
-# to measure the change
-enemyx_change = 3
-enemyy_change = 40
+# Multiple enemy
+enemyimg = []
+enemyx = []
+enemyy = []
+enemyx_change = []
+enemyy_change = []
+num_of_enemies = 6
+
+for i in range(num_of_enemies):
+    enemyimg.append( pg.image.load('./images/enemy.png') )
+    # playerx and playery are coordinates , pygame follows (0,0) coordinate system
+    enemyx.append(random.randint(0, 735) )
+    enemyy.append(random.randint(50, 150) )
+    # to measure the change
+    enemyx_change.append(3 )
+    enemyy_change.append(40 )
 
 
 
@@ -93,6 +111,28 @@ bullet_state = "ready"
     screen.blit(playerimg,(playerx, playery))
 """
 
+# score
+# Display text on the screen
+# For fonts download and keep in the directory
+# free font website dafont.com
+score = 0
+font = pg.font.Font('freesansbold.ttf', 32)
+
+textx = 10
+texty = 10
+
+# Game over text
+game_over = pg.font.Font('freesansbold.ttf', 60)
+
+def game_over_text():
+    s = game_over.render("GAME OVER",True, (255,255,255))
+    screen.blit(s,(200, 250))
+
+def show_score(x,y):
+    # rendering text
+    # font.render("Score :" + str(score),<do you want to display on screen>, (R,G,B))
+    s = font.render("Score :" + str(score),True, (255,255,255))
+    screen.blit(s,(x, y))
 
 
 # This function can be used for movements for player
@@ -104,9 +144,9 @@ def player(x,y):
 
 
 # This function can be used for movements for enemy
-def enemy(x,y):
+def enemy(x,y,i):
     # blit means drawing and we are drawing our player on the surface of our game
-    screen.blit(enemyimg,(x, y))
+    screen.blit(enemyimg[i],(x, y))
 
 
 
@@ -117,6 +157,15 @@ def fire_bullet(x,y):
     bullet_state = "fire"
     # blit means drawing and we are drawing our player on the surface of our game
     screen.blit(bulletimg,(x + 16 , y + 10))
+
+
+
+def isCollision(enemyx, enemyy, bulletx, bullety):
+    distance = math.sqrt( math.pow((bulletx- enemyx), 2) +  math.pow((bullety - enemyy), 2))
+    if distance < 27:
+        return True
+    else:
+        return False
 
 
 
@@ -151,7 +200,10 @@ while running:
                 # print("Right arrow pressed")
                 playerx_change += 5
             if event.key == pg.K_SPACE:
-                if bullet_state is "ready":
+                if bullet_state == "ready":
+                    # not giving -1 here because we don't intend to run it in a loop
+                    bullet_sound = mixer.Sound('./sound/laser.wav')
+                    bullet_sound.play()
                     fire_bullet(playerx,bullety)
                     bulletx = playerx
         
@@ -174,23 +226,45 @@ while running:
     if bullety<= 0:
         bullety = 480
         bullet_state = "ready"
-    if bullet_state is "fire":
+    if bullet_state == "fire":
         fire_bullet(bulletx, bullety)
         bullety -= bullety_change
 
     # Enemy movement
-    enemyx += enemyx_change
+    
+    for i in range(num_of_enemies):
 
-    if enemyx <= 0:
-        enemyx_change = 3
-        enemyy += enemyy_change
-    elif enemyx >=736:
-        enemyx_change = -3
-        enemyy += enemyy_change
+        # Game Over
+        if enemyy[i]>440:
+            for j in range(num_of_enemies):
+                enemyy[j] = 2000
+            game_over_text()
+            break
+
+        enemyx[i] += enemyx_change[i]
+        if enemyx[i] <= 0:
+            enemyx_change[i] = 3
+            enemyy[i] += enemyy_change[i]
+        elif enemyx[i] >=736:
+            enemyx_change[i] = -3
+            enemyy[i] += enemyy_change[i]
+
+        # Collision
+        collision = isCollision(enemyx[i] , enemyy[i] , bulletx, bullety)
+        if collision:
+            explosion_sound = mixer.Sound('./sound/explosion.wav')
+            explosion_sound.play()
+            bullety = 480
+            bullet_state = "ready"
+            score += 1
+            enemyx[i] = random.randint(0, 735)
+            enemyy[i] = random.randint(50, 150)
+
+        enemy(enemyx[i],enemyy[i] , i)
 
     # Always call the player function after the screen or else player won't appear on the screen
     # will appear behind the screen which is not desirerable
     player(playerx,playery)
-    enemy(enemyx,enemyy)
+    show_score(textx, texty)
     # Without update statement the color wont update
     pg.display.update()
